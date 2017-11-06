@@ -53,6 +53,14 @@
         />
 
     <menuitem
+        id="journal_report_wizard_menu"
+        name="Journal"
+        parent="account.menu_finance_legal_statement"
+        action="journal_report_wizard_act_window"
+        groups="base.group_erp_manager"
+        />
+
+    <menuitem
         id="account.menu_general_Balance_report"
         name="Trial Balance"
         parent="account.menu_finance_legal_statement"
