@@ -17,7 +17,8 @@ class ReportJournalQweb(models.TransientModel):
         comodel_name='res.company'
     )
     move_target = fields.Selection(
-        selection='_get_move_targets'
+        selection='_get_move_targets',
+        default='all',
     )
     journal_ids = fields.Many2many(
         comodel_name='account.journal',
@@ -39,6 +40,12 @@ class ReportJournalQweb(models.TransientModel):
         self._inject_move_line_values()
         self._inject_journal_tax_values()
         self._update_journal_report_total_values()
+
+    @api.multi
+    def refresh(self):
+        self.ensure_one()
+        self.report_journal_ids.unlink()
+        self.compute_data_for_report()
 
     @api.multi
     def _inject_journal_values(self):

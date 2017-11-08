@@ -16,6 +16,14 @@
         />
 
     <menuitem
+        id="journal_report_wizard_menu"
+        name="Journal"
+        parent="menu_oca_reports"
+        action="journal_report_wizard_act_window"
+        sequence="15"
+        />
+
+    <menuitem
         parent="menu_oca_reports"
         action="action_trial_balance_wizard"
         id="menu_trial_balance_wizard"
@@ -49,14 +57,6 @@
         name="General Ledger"
         parent="account.menu_finance_legal_statement"
         action="account.action_account_general_ledger_menu"
-        groups="base.group_erp_manager"
-        />
-
-    <menuitem
-        id="journal_report_wizard_menu"
-        name="Journal"
-        parent="account.menu_finance_legal_statement"
-        action="journal_report_wizard_act_window"
         groups="base.group_erp_manager"
         />
 
