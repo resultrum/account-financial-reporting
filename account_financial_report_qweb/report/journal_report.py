@@ -2,7 +2,7 @@
 # Copyright 2017 ACSONE SA/NV
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl).
 
-from odoo import models, fields, api, _
+from odoo import models, fields, api
 
 DIGITS = (16, 2)
 
@@ -45,28 +45,28 @@ class ReportJournalQweb(models.TransientModel):
         self.ensure_one()
         sql = """
             INSERT INTO report_journal_qweb_journal (
-              create_uid,
-              create_date,
-              report_id,
-              journal_id,
-              name,
-              code
+                create_uid,
+                create_date,
+                report_id,
+                journal_id,
+                name,
+                code
             )
             SELECT
-              %s as create_uid,
-              NOW() as create_date,
-              %s as report_id,
-              aj.id as journal_id,
-              aj.name as name,
-              aj.code as code
+                %s as create_uid,
+                NOW() as create_date,
+                %s as report_id,
+                aj.id as journal_id,
+                aj.name as name,
+                aj.code as code
             FROM
-              account_journal aj
+                account_journal aj
             WHERE
-              aj.id in %s
+                aj.id in %s
             AND
-              aj.company_id = %s
+                aj.company_id = %s
             ORDER BY
-              aj.name
+                aj.name
         """
         params = (
             self.env.uid,
@@ -79,136 +79,175 @@ class ReportJournalQweb(models.TransientModel):
     @api.multi
     def _inject_move_values(self):
         self.ensure_one()
-        sql = """
+        sql = self._get_inject_move_insert()
+        sql += self._get_inject_move_select()
+        sql += self._get_inject_move_where_clause()
+        sql += self._get_inject_move_order_by()
+        params = self._get_inject_move_params()
+        self.env.cr.execute(sql, params)
+
+    @api.multi
+    def _get_inject_move_insert(self):
+        return """
             INSERT INTO report_journal_qweb_move (
-              create_uid,
-              create_date,
-              report_id,
-              report_journal_id,
-              move_id,
-              name
+                create_uid,
+                create_date,
+                report_id,
+                report_journal_id,
+                move_id,
+                name
             )
-            SELECT
-              %s as create_uid,
-              NOW() as create_date,
-              rjqj.report_id as report_id,
-              rjqj.id as report_journal_id,
-              am.id as move_id,
-              am.name as name
-            FROM
-              account_move am
-            INNER JOIN
-              report_journal_qweb_journal rjqj 
-                on (rjqj.journal_id = am.journal_id)
-            WHERE 
-              rjqj.report_id = %s
-            AND
-              am.date >= %s
-            AND
-              am.date <= %s
-            ORDER BY
-              am.name
         """
-        params = (
+
+    @api.multi
+    def _get_inject_move_select(self):
+        return """
+            SELECT
+                %s as create_uid,
+                NOW() as create_date,
+                rjqj.report_id as report_id,
+                rjqj.id as report_journal_id,
+                am.id as move_id,
+                am.name as name
+            FROM
+                account_move am
+            INNER JOIN
+                report_journal_qweb_journal rjqj
+                    on (rjqj.journal_id = am.journal_id)
+        """
+
+    @api.multi
+    def _get_inject_move_where_clause(self):
+        self.ensure_one()
+        where_clause = """
+            WHERE
+                rjqj.report_id = %s
+            AND
+                am.date >= %s
+            AND
+                am.date <= %s
+        """
+        if self.move_target != 'all':
+            where_clause += """
+                AND
+                    am.state = %s
+            """
+        return where_clause
+
+    @api.multi
+    def _get_inject_move_order_by(self):
+        self.ensure_one()
+        return """
+            ORDER BY
+                am.name
+        """
+
+    @api.multi
+    def _get_inject_move_params(self):
+        params = [
             self.env.uid,
             self.id,
             self.date_from,
             self.date_to
-        )
-        self.env.cr.execute(sql, params)
+        ]
+
+        if self.move_target != 'all':
+            params.append(self.move_target)
+
+        return tuple(params)
 
     @api.multi
     def _inject_move_line_values(self):
         self.ensure_one()
         sql = """
             INSERT INTO report_journal_qweb_move_line (
-              create_uid,
-              create_date,
-              report_id,
-              report_journal_id,
-              report_move_id,
-              move_line_id,
-              account_id,
-              account,
-              account_code,
-              account_type,
-              partner_id,
-              partner,
-              date,
-              entry,
-              label,
-              debit,
-              credit,
-              balance,
-              tax_amount,
-              tax_id,
-              taxes_description
+                create_uid,
+                create_date,
+                report_id,
+                report_journal_id,
+                report_move_id,
+                move_line_id,
+                account_id,
+                account,
+                account_code,
+                account_type,
+                partner_id,
+                partner,
+                date,
+                entry,
+                label,
+                debit,
+                credit,
+                balance,
+                tax_amount,
+                tax_id,
+                taxes_description
             )
             SELECT
-              %s as create_uid,
-              NOW() as create_date,
-              rjqm.report_id as report_id,
-              rjqm.report_journal_id as report_journal_id,
-              rjqm.id as report_move_id,
-              aml.id as move_line_id,
-              aml.account_id as account_id,
-              aa.name as account,
-              aa.code as account_code,
-              aa.internal_type as account_type,
-              aml.partner_id as partner_id,
-              p.name as partner,
-              aml.date as date,
-              rjqm.name as entry,
-              aml.name as label,
-              aml.debit as debit,
-              aml.credit as credit,
-              (aml.debit - aml.credit) as balance,
-              CASE
-                WHEN
-                  aml.tax_line_id is NOT NULL
+                %s as create_uid,
+                NOW() as create_date,
+                rjqm.report_id as report_id,
+                rjqm.report_journal_id as report_journal_id,
+                rjqm.id as report_move_id,
+                aml.id as move_line_id,
+                aml.account_id as account_id,
+                aa.name as account,
+                aa.code as account_code,
+                aa.internal_type as account_type,
+                aml.partner_id as partner_id,
+                p.name as partner,
+                aml.date as date,
+                rjqm.name as entry,
+                aml.name as label,
+                aml.debit as debit,
+                aml.credit as credit,
+                (aml.debit - aml.credit) as balance,
+                CASE
+                    WHEN
+                        aml.tax_line_id is NOT NULL
+                    THEN
+                        (aml.debit + aml.credit)
+                    ELSE
+                        0
+                END as tax_amount,
+                aml.tax_line_id as tax_id,
+                CASE
+                    WHEN
+                      aml.tax_line_id is not null
                 THEN
-                  (aml.debit + aml.credit)
-                ELSE
-                  0
-              END as tax_amount,
-              aml.tax_line_id as tax_id,
-              CASE 
+                    COALESCE(at.description, at.name)
                 WHEN
-                  aml.tax_line_id is not null
+                    aml.tax_line_id is null
                 THEN
-                  COALESCE(at.description, at.name)
-                WHEN
-                  aml.tax_line_id is null
-                THEN
-                  (SELECT
-                    array_to_string(
-                      array_agg(COALESCE(at.description, at.name)
-                    ), ', ')
+                    (SELECT
+                      array_to_string(
+                          array_agg(COALESCE(at.description, at.name)
+                      ), ', ')
                     FROM
-                      account_move_line_account_tax_rel aml_at_rel
+                        account_move_line_account_tax_rel aml_at_rel
                     LEFT JOIN
-                      account_tax at on (at.id = aml_at_rel.account_tax_id)
+                        account_tax at on (at.id = aml_at_rel.account_tax_id)
                     WHERE
-                      aml_at_rel.account_move_line_id = aml.id)
+                        aml_at_rel.account_move_line_id = aml.id)
                 ELSE
                     ''
-              END as taxes_description
-            FROM 
-              account_move_line aml
+                END as taxes_description
+            FROM
+                account_move_line aml
             INNER JOIN
-              report_journal_qweb_move rjqm
-                on (rjqm.move_id = aml.move_id)
+                report_journal_qweb_move rjqm
+                    on (rjqm.move_id = aml.move_id)
             LEFT JOIN
-              account_account aa
-                on (aa.id = aml.account_id)
+                account_account aa
+                    on (aa.id = aml.account_id)
             LEFT JOIN
-              res_partner p
-                on (p.id = aml.partner_id)
+                res_partner p
+                    on (p.id = aml.partner_id)
             LEFT JOIN
-              account_tax at
-                on (at.id = aml.tax_line_id)
+                account_tax at
+                    on (at.id = aml.tax_line_id)
             WHERE
-              rjqm.report_id = %s
+                rjqm.report_id = %s
         """
         params = (
             self.env.uid,
@@ -221,12 +260,12 @@ class ReportJournalQweb(models.TransientModel):
         self.ensure_one()
 
         sql_distinct_tax_id = """
-            SELECT 
-              distinct(jrqml.tax_id)
-            FROM 
-              report_journal_qweb_move_line jrqml
+            SELECT
+                distinct(jrqml.tax_id)
+            FROM
+                report_journal_qweb_move_line jrqml
             WHERE
-              jrqml.report_journal_id = %s
+                jrqml.report_journal_id = %s
         """
 
         tax_ids_by_journal_id = {}
@@ -241,77 +280,77 @@ class ReportJournalQweb(models.TransientModel):
 
         sql = """
             INSERT INTO report_journal_qweb_journal_tax_line (
-              create_uid,
-              create_date,
-              report_id,
-              report_journal_id,
-              tax_id,
-              tax_name,
-              tax_code,
-              base_debit,
-              base_credit,
-              tax_debit,
-              tax_credit
+                create_uid,
+                create_date,
+                report_id,
+                report_journal_id,
+                tax_id,
+                tax_name,
+                tax_code,
+                base_debit,
+                base_credit,
+                tax_debit,
+                tax_credit
             )
-            SELECT 
-              %s as create_uid,
-              NOW() as create_date,
-              %s as report_id,
-              %s as report_journal_id,
-              %s as tax_id,
-              at.name as tax_name,
-              at.description as tax_code,
-              (
-                SELECT sum(debit)
-                FROM report_journal_qweb_move_line jrqml2
-                WHERE jrqml2.report_journal_id = %s
-                AND (
-                  SELECT
-                    count(*)
-                  FROM
-                    account_move_line_account_tax_rel aml_at_rel
-                  WHERE (
-                    aml_at_rel.account_move_line_id = jrqml2.move_line_id
-                  AND
-                    aml_at_rel.account_tax_id = %s
-                  )
-                ) > 0
-              ) as base_debit,
-              (
-                SELECT sum(credit)
-                FROM report_journal_qweb_move_line jrqml2
-                WHERE jrqml2.report_journal_id = %s
-                AND (
-                  SELECT
-                    count(*)
-                  FROM
-                    account_move_line_account_tax_rel aml_at_rel
-                  WHERE (
-                    aml_at_rel.account_move_line_id = jrqml2.move_line_id
-                  AND
-                    aml_at_rel.account_tax_id = %s
-                  )
-                ) > 0
-              ) as base_credit,
-              (
-                SELECT sum(debit)
-                FROM report_journal_qweb_move_line jrqml2
-                WHERE jrqml2.report_journal_id = %s
-                AND jrqml2.tax_id = %s
-              ) as tax_debit,
-              (
-                SELECT sum(credit)
-                FROM report_journal_qweb_move_line jrqml2
-                WHERE jrqml2.report_journal_id = %s
-                AND jrqml2.tax_id = %s
-              ) as tax_credit
+            SELECT
+                %s as create_uid,
+                NOW() as create_date,
+                %s as report_id,
+                %s as report_journal_id,
+                %s as tax_id,
+                at.name as tax_name,
+                at.description as tax_code,
+                (
+                    SELECT sum(debit)
+                    FROM report_journal_qweb_move_line jrqml2
+                    WHERE jrqml2.report_journal_id = %s
+                    AND (
+                        SELECT
+                            count(*)
+                        FROM
+                            account_move_line_account_tax_rel aml_at_rel
+                        WHERE
+                            aml_at_rel.account_move_line_id =
+                                jrqml2.move_line_id
+                        AND
+                            aml_at_rel.account_tax_id = %s
+                    ) > 0
+                ) as base_debit,
+                (
+                    SELECT sum(credit)
+                    FROM report_journal_qweb_move_line jrqml2
+                    WHERE jrqml2.report_journal_id = %s
+                    AND (
+                        SELECT
+                            count(*)
+                        FROM
+                            account_move_line_account_tax_rel aml_at_rel
+                        WHERE
+                            aml_at_rel.account_move_line_id =
+                                jrqml2.move_line_id
+                        AND
+                            aml_at_rel.account_tax_id = %s
+                    ) > 0
+                ) as base_credit,
+                (
+                    SELECT sum(debit)
+                    FROM report_journal_qweb_move_line jrqml2
+                    WHERE jrqml2.report_journal_id = %s
+                    AND jrqml2.tax_id = %s
+                ) as tax_debit,
+                (
+                    SELECT sum(credit)
+                    FROM report_journal_qweb_move_line jrqml2
+                    WHERE jrqml2.report_journal_id = %s
+                    AND jrqml2.tax_id = %s
+                ) as tax_credit
             FROM
-              report_journal_qweb_journal rjqj
+                report_journal_qweb_journal rjqj
             LEFT JOIN
-              account_tax at
-                on (at.id = %s)
+                account_tax at
+                    on (at.id = %s)
             WHERE
-              rjqj.id = %s
+                rjqj.id = %s
         """
 
         for report_journal_id in tax_ids_by_journal_id:
@@ -340,30 +379,30 @@ class ReportJournalQweb(models.TransientModel):
         self.ensure_one()
         sql = """
             UPDATE
-              report_journal_qweb_journal rjqj
+                report_journal_qweb_journal rjqj
             SET
-              debit = (
-                SELECT sum(rjqml.debit)
-                FROM report_journal_qweb_move_line rjqml
-                WHERE rjqml.report_journal_id = rjqj.id
-              ),
-              credit = (
-                SELECT sum(rjqml.credit)
-                FROM report_journal_qweb_move_line rjqml
-                WHERE rjqml.report_journal_id = rjqj.id
-              ),
-              balance = (
-                SELECT sum(rjqml.debit - rjqml.credit)
-                FROM report_journal_qweb_move_line rjqml
-                WHERE rjqml.report_journal_id = rjqj.id
-              ),
-              tax_amount = (
-                SELECT sum(rjqml.tax_amount)
-                FROM report_journal_qweb_move_line rjqml
-                WHERE rjqml.report_journal_id = rjqj.id
-              )
+                debit = (
+                    SELECT sum(rjqml.debit)
+                    FROM report_journal_qweb_move_line rjqml
+                    WHERE rjqml.report_journal_id = rjqj.id
+                ),
+                credit = (
+                    SELECT sum(rjqml.credit)
+                    FROM report_journal_qweb_move_line rjqml
+                    WHERE rjqml.report_journal_id = rjqj.id
+                ),
+                balance = (
+                    SELECT sum(rjqml.debit - rjqml.credit)
+                    FROM report_journal_qweb_move_line rjqml
+                    WHERE rjqml.report_journal_id = rjqj.id
+                ),
+                tax_amount = (
+                    SELECT sum(rjqml.tax_amount)
+                    FROM report_journal_qweb_move_line rjqml
+                    WHERE rjqml.report_journal_id = rjqj.id
+                )
             WHERE
-              rjqj.report_id = %s
+                rjqj.report_id = %s
         """
         self.env.cr.execute(sql, (self.id,))
 

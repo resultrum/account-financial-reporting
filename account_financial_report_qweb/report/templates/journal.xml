@@ -26,7 +26,7 @@
     <template id="account_financial_report_qweb.report_journal_qweb_journal">
         <div class="act_as_table list_table" style="margin-top: 10px;"/>
         <div class="act_as_caption account_title" style="width: 1141px !important;">
-            <span t-field="journal.name"/> - <span t-field="o.date_from"/> to <span t-field="o.date_to"/>
+            <span t-field="journal.name"/> - <span t-field="o.date_from"/> to <span t-field="o.date_to"/> - <span t-field="o.move_target"/> Moves
         </div>
 
         <div class="act_as_table data_table" style="width: 1140px !important;">

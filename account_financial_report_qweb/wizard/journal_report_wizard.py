@@ -33,7 +33,8 @@ class JournalReportWizard(models.TransientModel):
     )
     move_target = fields.Selection(
         selection='_get_move_targets',
-        default='all'
+        default='all',
+        required=True,
     )
 
     @api.model
@@ -41,7 +42,7 @@ class JournalReportWizard(models.TransientModel):
         return [
             ('all', _("All")),
             ('posted', _("Posted")),
-            ('not_posted', _("Not Posted"))
+            ('draft', _("Not Posted"))
         ]
 
     @api.onchange('date_range_id')
